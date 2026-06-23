@@ -10,7 +10,7 @@ import path from "path";
 import crypto from "crypto";
 
 program
-  .version("1.0.3")
+  .version("1.0.4")
   .description("PulseOS Automation Infrastructure Management");
 
 const generateJwtSecret = () => crypto.randomBytes(32).toString("hex");
@@ -21,7 +21,7 @@ program
   .action(async () => {
     console.log(
       chalk.cyan.bold(
-        "\n⚡ Welcome to PulseOS Automation Installer v1.0.2 ⚡\n",
+        "\n⚡ Welcome to PulseOS Automation Installer v1.0.4 ⚡\n",
       ),
     );
 
@@ -114,51 +114,51 @@ STATUS_PAGE_TITLE="System Status"
 STATUS_PAGE_DESC="Real-time service operational status"
 DB_PATH=apps/api/data/pulseos.db
 `;
+
+    // Tulis ke ROOT (.env global & keperluan Astro)
     fs.writeFileSync(path.join(targetPath, ".env"), rootEnvContent);
 
+    // Tulis ke dalam apps/api/.env agar runtime backend langsung mengenali environment
+    fs.writeFileSync(path.join(targetPath, "apps/api/.env"), rootEnvContent);
+
+    // Build apps/web/.env (Frontend Astro)
     const webEnvContent = `PUBLIC_API_URL=${answers.publicApiUrl}\n`;
     fs.writeFileSync(path.join(targetPath, "apps/web/.env"), webEnvContent);
 
     configSpinner.succeed(
-      chalk.green(".env configuration and SQLite folder are ready."),
+      chalk.green("Environment configurations generated successfully."),
     );
 
     // --- Dynamic User Detection for Sudo Bypass ---
     const originalUser = process.env.SUDO_USER;
     const npmPrefix = originalUser ? `sudo -u ${originalUser} ` : "";
 
-    // Fix permissions folder hasil clone agar dimiliki oleh user asli
+    // Kembalikan hak akses kepemilikan folder ke user non-root
     if (originalUser) {
       shell.exec(`chown -R ${originalUser}:${originalUser} "${targetPath}"`, {
         silent: true,
       });
     }
 
-    // 4. Install Monorepo Dependencies (Executed as original user)
-    const installSpinner = ora("Installing dependencies...").start();
-    // Ubah silent menjadi false sementara agar error aslinya kelihatan di terminal VPS
-    const installResult = shell.exec(`${npmPrefix}npm install`, {
-      silent: false,
-    });
+    // 4. Install Monorepo Dependencies
+    const installSpinner = ora("Installing monorepo dependencies...").start();
+    const installResult = shell.exec(`${npmPrefix}npm install`, { silent: true });
 
     if (installResult.code !== 0) {
-      installSpinner.fail(chalk.red("Failed to install npm dependencies."));
-      console.log(
-        chalk.red(`\n❌ NPM Error Logs:\n`),
-        installResult.stderr || installResult.stdout,
-      );
+      installSpinner.fail(chalk.red("Installation of npm dependencies failed."));
+      console.log(chalk.yellow("\n💡 Suggestion: Try to run 'npm cache clean --force' or check your Node.js engine compatibility."));
       process.exit(1);
     }
     installSpinner.succeed(
-      chalk.green("All dependencies installed successfully."),
+      chalk.green("All infrastructure dependencies installed safely."),
     );
 
-    // 5. Build Monorepo (Executed as original user)
+    // 5. Build Monorepo
     const buildSpinner = ora("Running sequential production build...").start();
     if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       buildSpinner.fail(
         chalk.red(
-          "Production build process failed. Please check your node environment.",
+          "Production build process failed. Please inspect your workspace typescript compilation.",
         ),
       );
       process.exit(1);
@@ -189,7 +189,7 @@ program
     if (!fs.existsSync("./apps/api") || !fs.existsSync("./apps/web")) {
       console.log(
         chalk.red(
-          "❌ Error: Please run this command inside the root folder of your PulseOS installation!",
+          "❌ Error: Directory invalid. Please run this command inside the root folder of your PulseOS installation!",
         ),
       );
       process.exit(1);
@@ -208,7 +208,7 @@ program
       backupSpinner.succeed(chalk.green("Database backed up securely."));
     } else {
       backupSpinner.info(
-        chalk.gray("Database file not found yet, skipping backup process."),
+        chalk.gray("Database container is fresh, skipping backup process."),
       );
     }
 
@@ -223,18 +223,18 @@ program
       shell.exec(`${npmPrefix}git pull origin main`, { silent: true }).code !==
       0
     ) {
-      gitSpinner.fail(chalk.red("Failed to perform git pull."));
+      gitSpinner.fail(chalk.red("Failed to perform git pull stream."));
       process.exit(1);
     }
     shell.exec(`${npmPrefix}git stash pop`, { silent: true });
     gitSpinner.succeed(chalk.green("Source code updated successfully."));
 
-    // 3. Synchronize Dependencies (Executed as original user)
+    // 3. Synchronize Dependencies
     const updateDepsSpinner = ora("Synchronizing new dependencies...").start();
     shell.exec(`${npmPrefix}npm install`, { silent: true });
     updateDepsSpinner.succeed(chalk.green("Dependencies synchronized."));
 
-    // 4. Rebuild Project Monorepo (Executed as original user)
+    // 4. Rebuild Project Monorepo
     const rebuildSpinner = ora("Rebuilding production structure...").start();
     if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       rebuildSpinner.fail(chalk.red("Failed to rebuild production build."));
