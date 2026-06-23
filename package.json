@@ -7,8 +7,21 @@
   "bin": {
     "pulseos": "index.js"
   },
-  "keywords": ["pulseos", "cli", "vps", "monitoring"],
-  "author": "Your Name",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AkyasMahira/pulseos-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AkyasMahira/pulseos-cli/issues"
+  },
+  "homepage": "https://github.com/AkyasMahira/pulseos-cli#readme",
+  "keywords": [
+    "pulseos",
+    "cli",
+    "vps",
+    "monitoring"
+  ],
+  "author": "Akyas Mahira",
   "license": "MIT",
   "dependencies": {
     "chalk": "^5.3.0",
