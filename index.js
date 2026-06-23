@@ -10,10 +10,9 @@ import path from "path";
 import crypto from "crypto";
 
 program
-  .version("1.0.0")
+  .version("1.0.1") // Naik ke patch 1.0.1 untuk kompatibilitas sudo
   .description("PulseOS Automation Infrastructure Management");
 
-// --- HELPER: Generate Random Secret ---
 const generateJwtSecret = () => crypto.randomBytes(32).toString("hex");
 
 program
@@ -22,7 +21,7 @@ program
   .action(async () => {
     console.log(
       chalk.cyan.bold(
-        "\n⚡ Welcome to PulseOS Automation Installer v1.0.0 ⚡\n",
+        "\n⚡ Welcome to PulseOS Automation Installer v1.0.1 ⚡\n",
       ),
     );
 
@@ -87,33 +86,19 @@ program
     }
     cloneSpinner.succeed(chalk.green("Source code downloaded successfully."));
 
-    // Change directory to the cloned repository
+    // Pindah ke direktori project hasil clone sebelum manipulasi file & npm
     shell.cd(targetPath);
 
-    // 3. Install Monorepo Dependencies
-    const installSpinner = ora(
-      "Installing monorepo dependencies (npm install)...",
-    ).start();
-    if (shell.exec("npm install", { silent: true }).code !== 0) {
-      installSpinner.fail(chalk.red("Failed to install npm dependencies."));
-      process.exit(1);
-    }
-    installSpinner.succeed(
-      chalk.green("All dependencies installed successfully."),
-    );
-
-    // 4. Configure Environment Variables & Data Structure
+    // 3. Configure Environment Variables & Data Structure (Ditarik ke atas)
     const configSpinner = ora(
       "Configuring environment variables & data structure...",
     ).start();
 
-    // Auto-create data directory for SQLite to prevent race conditions
     const dbDir = path.join(targetPath, "apps/api/data");
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
     }
 
-    // Build Root .env (Backend API)
     const jwtSecret = generateJwtSecret();
     const rootEnvContent = `PORT=${answers.apiPort}
 HOST=0.0.0.0
@@ -132,7 +117,6 @@ DB_PATH=apps/api/data/pulseos.db
 `;
     fs.writeFileSync(path.join(targetPath, ".env"), rootEnvContent);
 
-    // Build apps/web/.env (Frontend Astro)
     const webEnvContent = `PUBLIC_API_URL=${answers.publicApiUrl}\n`;
     fs.writeFileSync(path.join(targetPath, "apps/web/.env"), webEnvContent);
 
@@ -140,11 +124,23 @@ DB_PATH=apps/api/data/pulseos.db
       chalk.green(".env configuration and SQLite folder are ready."),
     );
 
-    // 5. Build Monorepo (Order: types -> api -> web)
+    // 4. Install Monorepo Dependencies (Ditambahkan flag --allow-root)
+    const installSpinner = ora(
+      "Installing dependencies (npm install)...",
+    ).start();
+    if (shell.exec("npm install --allow-root", { silent: true }).code !== 0) {
+      installSpinner.fail(chalk.red("Failed to install npm dependencies."));
+      process.exit(1);
+    }
+    installSpinner.succeed(
+      chalk.green("All dependencies installed successfully."),
+    );
+
+    // 5. Build Monorepo (Ditambahkan flag --allow-root)
     const buildSpinner = ora(
       "Running sequential production build (types ➜ api ➜ web)...",
     ).start();
-    if (shell.exec("npm run build", { silent: true }).code !== 0) {
+    if (shell.exec("npm run build --allow-root", { silent: true }).code !== 0) {
       buildSpinner.fail(
         chalk.red(
           "Production build process failed. Please check your node environment.",
@@ -156,7 +152,6 @@ DB_PATH=apps/api/data/pulseos.db
       chalk.green("Monorepo compilation completed successfully."),
     );
 
-    // 6. Final Output Instructions
     console.log(chalk.green.bold("\n🎉 PulseOS Installed Successfully!"));
     console.log(`\nPlease navigate to the application directory to start:`);
     console.log(chalk.cyan(`  cd ${answers.folderName}`));
@@ -176,7 +171,6 @@ program
   .action(async () => {
     console.log(chalk.yellow.bold("\n🔄 Starting PulseOS Update Process...\n"));
 
-    // Validate execution directory location
     if (!fs.existsSync("./apps/api") || !fs.existsSync("./apps/web")) {
       console.log(
         chalk.red(
@@ -213,16 +207,16 @@ program
     shell.exec("git stash pop", { silent: true });
     gitSpinner.succeed(chalk.green("Source code updated successfully."));
 
-    // 3. Synchronize Dependencies
+    // 3. Synchronize Dependencies (Ditambahkan flag --allow-root)
     const updateDepsSpinner = ora("Synchronizing new dependencies...").start();
-    shell.exec("npm install", { silent: true });
+    shell.exec("npm install --allow-root", { silent: true });
     updateDepsSpinner.succeed(chalk.green("Dependencies synchronized."));
 
-    // 4. Rebuild Project Monorepo
+    // 4. Rebuild Project Monorepo (Ditambahkan flag --allow-root)
     const rebuildSpinner = ora(
       "Rebuilding production structure (Build)...",
     ).start();
-    if (shell.exec("npm run build", { silent: true }).code !== 0) {
+    if (shell.exec("npm run build --allow-root", { silent: true }).code !== 0) {
       rebuildSpinner.fail(chalk.red("Failed to rebuild production build."));
       process.exit(1);
     }
