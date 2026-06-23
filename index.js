@@ -10,7 +10,7 @@ import path from "path";
 import crypto from "crypto";
 
 program
-  .version("1.0.1") // Naik ke patch 1.0.1 untuk kompatibilitas sudo
+  .version("1.0.2")
   .description("PulseOS Automation Infrastructure Management");
 
 const generateJwtSecret = () => crypto.randomBytes(32).toString("hex");
@@ -21,7 +21,7 @@ program
   .action(async () => {
     console.log(
       chalk.cyan.bold(
-        "\n⚡ Welcome to PulseOS Automation Installer v1.0.1 ⚡\n",
+        "\n⚡ Welcome to PulseOS Automation Installer v1.0.2 ⚡\n",
       ),
     );
 
@@ -86,10 +86,9 @@ program
     }
     cloneSpinner.succeed(chalk.green("Source code downloaded successfully."));
 
-    // Pindah ke direktori project hasil clone sebelum manipulasi file & npm
     shell.cd(targetPath);
 
-    // 3. Configure Environment Variables & Data Structure (Ditarik ke atas)
+    // 3. Configure Environment Variables & Data Structure
     const configSpinner = ora(
       "Configuring environment variables & data structure...",
     ).start();
@@ -124,11 +123,20 @@ DB_PATH=apps/api/data/pulseos.db
       chalk.green(".env configuration and SQLite folder are ready."),
     );
 
-    // 4. Install Monorepo Dependencies (Ditambahkan flag --allow-root)
+    // --- Dynamic User Detection for Sudo Bypass ---
+    const originalUser = process.env.SUDO_USER;
+    const npmPrefix = originalUser ? `sudo -u ${originalUser} ` : "";
+
+    // Fix permissions folder hasil clone agar dimiliki oleh user asli
+    if (originalUser) {
+      shell.exec(`chown -R ${originalUser}:${originalUser} "${targetPath}"`, { silent: true });
+    }
+
+    // 4. Install Monorepo Dependencies (Executed as original user)
     const installSpinner = ora(
-      "Installing dependencies (npm install)...",
+      "Installing dependencies...",
     ).start();
-    if (shell.exec("npm install --allow-root", { silent: true }).code !== 0) {
+    if (shell.exec(`${npmPrefix}npm install`, { silent: true }).code !== 0) {
       installSpinner.fail(chalk.red("Failed to install npm dependencies."));
       process.exit(1);
     }
@@ -136,11 +144,11 @@ DB_PATH=apps/api/data/pulseos.db
       chalk.green("All dependencies installed successfully."),
     );
 
-    // 5. Build Monorepo (Ditambahkan flag --allow-root)
+    // 5. Build Monorepo (Executed as original user)
     const buildSpinner = ora(
-      "Running sequential production build (types ➜ api ➜ web)...",
+      "Running sequential production build...",
     ).start();
-    if (shell.exec("npm run build --allow-root", { silent: true }).code !== 0) {
+    if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       buildSpinner.fail(
         chalk.red(
           "Production build process failed. Please check your node environment.",
@@ -197,26 +205,30 @@ program
       );
     }
 
+    // --- Dynamic User Detection for Sudo Bypass ---
+    const originalUser = process.env.SUDO_USER;
+    const npmPrefix = originalUser ? `sudo -u ${originalUser} ` : "";
+
     // 2. Execute Git Pull with Stash Safe-Guard
     const gitSpinner = ora("Pulling latest source-code from GitHub...").start();
-    shell.exec("git stash", { silent: true });
-    if (shell.exec("git pull origin main", { silent: true }).code !== 0) {
+    shell.exec(`${npmPrefix}git stash`, { silent: true });
+    if (shell.exec(`${npmPrefix}git pull origin main`, { silent: true }).code !== 0) {
       gitSpinner.fail(chalk.red("Failed to perform git pull."));
       process.exit(1);
     }
-    shell.exec("git stash pop", { silent: true });
+    shell.exec(`${npmPrefix}git stash pop`, { silent: true });
     gitSpinner.succeed(chalk.green("Source code updated successfully."));
 
-    // 3. Synchronize Dependencies (Ditambahkan flag --allow-root)
+    // 3. Synchronize Dependencies (Executed as original user)
     const updateDepsSpinner = ora("Synchronizing new dependencies...").start();
-    shell.exec("npm install --allow-root", { silent: true });
+    shell.exec(`${npmPrefix}npm install`, { silent: true });
     updateDepsSpinner.succeed(chalk.green("Dependencies synchronized."));
 
-    // 4. Rebuild Project Monorepo (Ditambahkan flag --allow-root)
+    // 4. Rebuild Project Monorepo (Executed as original user)
     const rebuildSpinner = ora(
-      "Rebuilding production structure (Build)...",
+      "Rebuilding production structure...",
     ).start();
-    if (shell.exec("npm run build --allow-root", { silent: true }).code !== 0) {
+    if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       rebuildSpinner.fail(chalk.red("Failed to rebuild production build."));
       process.exit(1);
     }
