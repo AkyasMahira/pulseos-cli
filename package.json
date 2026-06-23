@@ -1,6 +1,6 @@
 {
   "name": "pulseos",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Official CLI for PulseOS - Lightweight Monorepo VPS Monitor",
   "main": "index.js",
   "type": "module",

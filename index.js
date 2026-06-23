@@ -10,7 +10,7 @@ import path from "path";
 import crypto from "crypto";
 
 program
-  .version("1.0.2")
+  .version("1.0.3")
   .description("PulseOS Automation Infrastructure Management");
 
 const generateJwtSecret = () => crypto.randomBytes(32).toString("hex");
@@ -129,15 +129,24 @@ DB_PATH=apps/api/data/pulseos.db
 
     // Fix permissions folder hasil clone agar dimiliki oleh user asli
     if (originalUser) {
-      shell.exec(`chown -R ${originalUser}:${originalUser} "${targetPath}"`, { silent: true });
+      shell.exec(`chown -R ${originalUser}:${originalUser} "${targetPath}"`, {
+        silent: true,
+      });
     }
 
     // 4. Install Monorepo Dependencies (Executed as original user)
-    const installSpinner = ora(
-      "Installing dependencies...",
-    ).start();
-    if (shell.exec(`${npmPrefix}npm install`, { silent: true }).code !== 0) {
+    const installSpinner = ora("Installing dependencies...").start();
+    // Ubah silent menjadi false sementara agar error aslinya kelihatan di terminal VPS
+    const installResult = shell.exec(`${npmPrefix}npm install`, {
+      silent: false,
+    });
+
+    if (installResult.code !== 0) {
       installSpinner.fail(chalk.red("Failed to install npm dependencies."));
+      console.log(
+        chalk.red(`\n❌ NPM Error Logs:\n`),
+        installResult.stderr || installResult.stdout,
+      );
       process.exit(1);
     }
     installSpinner.succeed(
@@ -145,9 +154,7 @@ DB_PATH=apps/api/data/pulseos.db
     );
 
     // 5. Build Monorepo (Executed as original user)
-    const buildSpinner = ora(
-      "Running sequential production build...",
-    ).start();
+    const buildSpinner = ora("Running sequential production build...").start();
     if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       buildSpinner.fail(
         chalk.red(
@@ -212,7 +219,10 @@ program
     // 2. Execute Git Pull with Stash Safe-Guard
     const gitSpinner = ora("Pulling latest source-code from GitHub...").start();
     shell.exec(`${npmPrefix}git stash`, { silent: true });
-    if (shell.exec(`${npmPrefix}git pull origin main`, { silent: true }).code !== 0) {
+    if (
+      shell.exec(`${npmPrefix}git pull origin main`, { silent: true }).code !==
+      0
+    ) {
       gitSpinner.fail(chalk.red("Failed to perform git pull."));
       process.exit(1);
     }
@@ -225,9 +235,7 @@ program
     updateDepsSpinner.succeed(chalk.green("Dependencies synchronized."));
 
     // 4. Rebuild Project Monorepo (Executed as original user)
-    const rebuildSpinner = ora(
-      "Rebuilding production structure...",
-    ).start();
+    const rebuildSpinner = ora("Rebuilding production structure...").start();
     if (shell.exec(`${npmPrefix}npm run build`, { silent: true }).code !== 0) {
       rebuildSpinner.fail(chalk.red("Failed to rebuild production build."));
       process.exit(1);
